@@ -1,19 +1,11 @@
-"""Thin AgentCore Payments data-plane client + x402 HTTP interceptor.
+"""AgentCore Payments data-plane client + x402 HTTP interceptor.
 
-Two IAM roles back the data plane (created by the prototype's setup_roles.sh):
-
-  * ManagementRole       → create/get payment instruments (wallets), balances,
-                           and create/get payment sessions. Explicitly DENIED
-                           ProcessPayment.
-  * ProcessPaymentRole   → ProcessPayment only.
-
-We assume whichever role an operation needs via STS and build a fresh
-`bedrock-agentcore` client with the temporary credentials. STS creds last ~1h;
-clients are cached per role and lazily rebuilt, which is ample for request-scoped
-use. The x402 interceptor (initial request → read 402 → ProcessPayment → attach
-proof → retry) is ported from the reference prototype, generalized to take the
-per-user instrument and per-query session as call arguments, with an `on_quote`
-hook so callers can enforce spend caps before any payment is signed.
+Two IAM roles back the data plane: ManagementRole (instruments, sessions,
+balance) and ProcessPaymentRole (process_payment only). Each operation assumes
+the role it needs via STS. The x402 interceptor (request → read 402 →
+process_payment → attach proof → retry) is ported from the reference prototype,
+generalized to take a per-user instrument and per-query session, with an
+`on_quote` hook so callers can veto a payment before it is signed.
 """
 
 from __future__ import annotations
@@ -43,12 +35,7 @@ def _json_safe(value: Any) -> Any:
 
 
 def quote_usd_from_payload(payload: dict[str, Any], decimals: int) -> float | None:
-    """Best-effort USD price of an x402 accept option.
-
-    x402 quotes carry the price in the asset's atomic units (USDC = 6 decimals)
-    under `maxAmountRequired` (preferred) or `amount`. Returns None when neither
-    is parseable so callers can decide how to treat an unknown-cost resource.
-    """
+    """USD price of an x402 accept option from its atomic-unit amount, or None."""
     raw = payload.get("maxAmountRequired", payload.get("amount"))
     if raw is None:
         return None
@@ -68,7 +55,6 @@ class AgentCorePayments:
         self.config = config or get_payments_config()
         self._clients: dict[str, Any] = {}
 
-    # ── client / role plumbing ────────────────────────────────────────
     def _client_for(self, role_arn: str):
         cached = self._clients.get(role_arn)
         if cached is not None:
@@ -101,22 +87,19 @@ class AgentCorePayments:
     def _pay(self):
         return self._client_for(self.config.process_payment_role_arn)
 
-    # ── wallets (payment instruments) ─────────────────────────────────
     def create_embedded_wallet(self, user_id: str, email: str) -> dict[str, Any]:
-        """Create one CDP Embedded Wallet for `user_id`. Returns the instrument
-        id, wallet address, and the WalletHub redirect URL the user must open to
-        grant delegated-signing permission before payments will succeed."""
-        details = {
-            "embeddedCryptoWallet": {
-                "network": self.config.wallet_network,
-                "linkedAccounts": [{"email": {"emailAddress": email}}],
-            }
-        }
+        """Create one CDP Embedded Wallet for `user_id`; returns instrument id,
+        address, and the WalletHub redirect_url for the delegated-signing grant."""
         resp = self._mgmt.create_payment_instrument(
             paymentManagerArn=self.config.manager_arn,
             paymentConnectorId=self.config.connector_id,
             paymentInstrumentType="EMBEDDED_CRYPTO_WALLET",
-            paymentInstrumentDetails=details,
+            paymentInstrumentDetails={
+                "embeddedCryptoWallet": {
+                    "network": self.config.wallet_network,
+                    "linkedAccounts": [{"email": {"emailAddress": email}}],
+                }
+            },
             userId=user_id,
             clientToken=str(uuid.uuid4()),
         )
@@ -132,8 +115,7 @@ class AgentCorePayments:
         return self._instrument_summary(resp.get("paymentInstrument", {}))
 
     def get_wallet_balance(self, user_id: str, instrument_id: str) -> dict[str, Any] | None:
-        """Best-effort balance read. Returns None on any error so callers can
-        still surface wallet metadata when the balance API is unavailable."""
+        """Best-effort balance read; None on any error so callers can degrade."""
         try:
             resp = self._mgmt.get_payment_instrument_balance(
                 paymentManagerArn=self.config.manager_arn,
@@ -157,23 +139,16 @@ class AgentCorePayments:
             "status": instrument.get("status"),
         }
 
-    # ── sessions (carry the per-query spend cap) ──────────────────────
     def create_session(self, user_id: str, max_spend_usd: float) -> str:
         resp = self._mgmt.create_payment_session(
             paymentManagerArn=self.config.manager_arn,
             expiryTimeInMinutes=self.config.session_expiry_minutes,
-            limits={
-                "maxSpendAmount": {
-                    "value": f"{max_spend_usd:.6f}",
-                    "currency": "USD",
-                }
-            },
+            limits={"maxSpendAmount": {"value": f"{max_spend_usd:.6f}", "currency": "USD"}},
             userId=user_id,
             clientToken=str(uuid.uuid4()),
         )
         return resp["paymentSession"]["paymentSessionId"]
 
-    # ── payment ───────────────────────────────────────────────────────
     def process_payment(
         self,
         *,
@@ -201,17 +176,11 @@ class AgentCorePayments:
 
 
 class QuoteRejected(Exception):
-    """Raised by an `on_quote` hook to abort before any payment is signed."""
+    """Raised by an `on_quote` hook to abort before a payment is signed."""
 
 
 class X402Interceptor:
-    """Deterministic paid-request flow for a single (user, session, wallet).
-
-    Ported from the reference prototype's HeuristX402Client; the fixed env
-    session/instrument are replaced with the per-call values handed in here, and
-    an `on_quote(quote_usd)` hook fires after the price is known but before
-    ProcessPayment, so spend caps can veto the payment.
-    """
+    """Single paid-request flow for one (user, session, wallet)."""
 
     def __init__(
         self,
@@ -266,9 +235,7 @@ class X402Interceptor:
         return info, int(info.get("x402Version", 1))
 
     @classmethod
-    def _extract_requirement(
-        cls, response: requests.Response
-    ) -> tuple[dict[str, Any], dict[str, Any], int]:
+    def _extract_requirement(cls, response: requests.Response) -> tuple[dict[str, Any], dict[str, Any], int]:
         info, version = cls._parse_payment_info(response)
         accepts = info.get("accepts", [])
         if not accepts:
@@ -276,9 +243,8 @@ class X402Interceptor:
         return info, accepts[0], version
 
     def _canonicalize(self, url: str, method: str, payload: dict[str, Any]) -> dict[str, Any]:
-        # POST quotes can omit fields the signer needs; a GET to the same URL
-        # usually returns the canonical requirement. Fall back to the original
-        # on any error.
+        # A POST 402 can omit fields the signer needs; the GET form returns the
+        # canonical requirement. Fall back to the original on any error.
         if method.upper() == "GET":
             return payload
         try:
@@ -320,10 +286,8 @@ class X402Interceptor:
         method: str = "POST",
         max_attempts: int = 6,
     ) -> dict[str, Any]:
-        """Returns a result dict with `status` in {success, success_without_payment,
-        unexpected_initial_status, missing_accepts, payment_failed,
-        insufficient_balance, retry_failed_*, retry_exhausted} plus `quote_usd`
-        once known. Raises QuoteRejected if the on_quote hook vetoes the price."""
+        """Run the paid request and return a result dict carrying `status` and
+        `quote_usd`. Raises QuoteRejected if the on_quote hook vetoes the price."""
         result: dict[str, Any] = {"url": url, "method": method, "quote_usd": None}
         first = self._request(method, url, body=body, timeout=30)
         result["initial_status_code"] = first.status_code
@@ -349,8 +313,6 @@ class X402Interceptor:
         quote_usd = quote_usd_from_payload(canonical, self.ac.config.usdc_decimals)
         result["quote_usd"] = quote_usd
 
-        # Spend-cap gate: fires before any money moves. A raise here aborts the
-        # whole call and no PaymentSession spend is consumed.
         if self.on_quote is not None:
             self.on_quote(quote_usd)
 

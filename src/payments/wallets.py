@@ -1,10 +1,8 @@
-"""Per-user CDP Embedded Wallet store + lazy provisioning.
+"""Per-user CDP Embedded Wallet store and lazy provisioning.
 
-One wallet (AgentCore payment instrument) per user, persisted in `user_wallets`.
-Provisioning is lazy and idempotent: the first call that needs a wallet creates
-it; subsequent calls return the stored row. The newly created wallet is in
-`pending_grant` status until the user opens `redirect_url` (Coinbase WalletHub)
-and grants delegated-signing permission — surface that URL to the user.
+One wallet (AgentCore payment instrument) per user in `user_wallets`, created on
+first need and reused thereafter. A new wallet is `pending_grant` until the user
+opens `redirect_url` (Coinbase WalletHub) to grant delegated signing.
 """
 
 from __future__ import annotations
@@ -17,16 +15,13 @@ from src.payments.config import PaymentsConfig, get_payments_config
 
 
 def synthesize_email(user_id: str, cfg: PaymentsConfig) -> str:
-    """Stable per-user linked email when the caller doesn't supply a real one."""
     safe = "".join(c if (c.isalnum() or c in "._-") else "-" for c in user_id).strip("-")
     return f"{safe or 'user'}@{cfg.linked_email_domain}"
 
 
 def get_wallet_row(user_id: str) -> dict[str, Any] | None:
     with db() as conn:
-        row = conn.execute(
-            "SELECT * FROM user_wallets WHERE user_id = ?", (user_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM user_wallets WHERE user_id = ?", (user_id,)).fetchone()
         return dict(row) if row else None
 
 
@@ -37,10 +32,7 @@ def get_or_provision(
     agentcore: AgentCorePayments | None = None,
     cfg: PaymentsConfig | None = None,
 ) -> dict[str, Any]:
-    """Return the user's wallet row, creating the embedded wallet if absent.
-
-    Idempotent: a second call returns the existing row without hitting AgentCore.
-    """
+    """Return the user's wallet row, creating the embedded wallet if absent."""
     existing = get_wallet_row(user_id)
     if existing:
         return existing
@@ -71,16 +63,12 @@ def get_or_provision(
             ),
         )
         conn.commit()
-    # Re-read so a racing concurrent insert still yields the canonical row.
     return get_wallet_row(user_id)  # type: ignore[return-value]
 
 
 def refresh_status(user_id: str, agentcore: AgentCorePayments | None = None) -> dict[str, Any] | None:
-    """Re-read the instrument from AgentCore and sync address/status locally.
-
-    Useful after the user completes the WalletHub delegated-signing grant — the
-    instrument flips to ACTIVE and a wallet address may appear.
-    """
+    """Re-read the instrument from AgentCore and sync address/status locally
+    (the instrument flips to ACTIVE once the WalletHub grant is completed)."""
     row = get_wallet_row(user_id)
     if not row:
         return None

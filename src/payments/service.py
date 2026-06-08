@@ -1,18 +1,9 @@
 """Pay for a single x402 resource on behalf of a user, within their quotas.
 
-The core logic the dev `/pay` endpoint exercises and the agent orchestrator will
-later call per paid tool:
-
-  1. Ensure the user has an embedded wallet (lazy provision).
-  2. Compute the per-query / remaining-per-day caps from quotas + ledger.
-  3. Hard-block up front if the daily cap is already spent.
-  4. Open a PaymentSession whose maxSpendAmount = the effective cap (AWS enforces
-     it in flight) and run the x402 flow, with an on_quote gate that rejects an
-     over-cap quote before any payment is signed.
-  5. Record the outcome (settled / blocked_quota / failed / ...) to the ledger.
-
-Multiple calls sharing one `invocation_id` accumulate toward the same per-query
-cap, so an agent that pays for several resources in one turn is bounded in total.
+Ensures a wallet, derives the per-query / remaining-per-day caps, opens a
+PaymentSession carrying the tightest cap (AWS enforces it in flight), runs the
+x402 flow with an on_quote gate, and records the outcome to the ledger. Calls
+sharing an `invocation_id` accumulate toward the same per-query cap.
 """
 
 from __future__ import annotations
@@ -26,10 +17,7 @@ from src.payments.config import PaymentsConfig, get_payments_config
 from src.payments.quotas import QuotaError
 
 
-def _effective_caps(
-    user_id: str, invocation_id: str, q: dict[str, Any]
-) -> tuple[float | None, float | None]:
-    """(remaining_per_query, remaining_per_day) in USD; None = unlimited."""
+def _effective_caps(user_id: str, invocation_id: str, q: dict[str, Any]) -> tuple[float | None, float | None]:
     per_query = q.get("max_spend_per_query_usd")
     per_day = q.get("max_spend_per_day_usd")
     remaining_query = (
@@ -65,7 +53,6 @@ def pay_for_resource(
 
     remaining_query, remaining_day = _effective_caps(user_id, invocation_id, q)
 
-    # Daily cap already exhausted → block without touching AgentCore.
     if remaining_day is not None and remaining_day <= 0:
         quotas.record_payment(
             user_id=user_id, invocation_id=invocation_id, resource_url=resource_url,
@@ -75,14 +62,13 @@ def pay_for_resource(
         return _envelope(invocation_id, wallet, q, status="blocked_quota",
                          detail="Daily spend cap already reached.", result=None)
 
-    # Session limit = tightest active cap (AWS enforces it in flight).
     caps = [c for c in (remaining_query, remaining_day) if c is not None]
     session_cap = min(caps) if caps else cfg.unlimited_session_cap_usd
     session_id = agentcore.create_session(user_id, session_cap)
 
     def on_quote(quote_usd: float | None) -> None:
         if quote_usd is None:
-            return  # unknown price — let AWS's session cap be the backstop
+            return
         if remaining_query is not None and quote_usd > remaining_query:
             raise QuotaError("per_query", remaining_query, quote_usd)
         if remaining_day is not None and quote_usd > remaining_day:
@@ -99,17 +85,7 @@ def pay_for_resource(
 
     try:
         result = interceptor.fetch_with_payment(resource_url, body=body, method=method)
-    except QuoteRejected as exc:  # pragma: no cover - hook raises QuotaError directly
-        result = None
-        quotas.record_payment(
-            user_id=user_id, invocation_id=invocation_id, resource_url=resource_url,
-            amount_usd=0.0, status="blocked_quota", detail=str(exc),
-            payment_session_id=session_id, payment_instrument_id=instrument_id,
-            x402_network=network,
-        )
-        return _envelope(invocation_id, wallet, q, status="blocked_quota",
-                         detail=str(exc), result=None)
-    except QuotaError as exc:
+    except (QuoteRejected, QuotaError) as exc:
         quotas.record_payment(
             user_id=user_id, invocation_id=invocation_id, resource_url=resource_url,
             amount_usd=0.0, status="blocked_quota", detail=str(exc),
@@ -124,7 +100,7 @@ def pay_for_resource(
     if status == "success":
         ledger_status, amount = "settled", float(quote_usd)
     elif status == "success_without_payment":
-        ledger_status, amount = "settled", 0.0  # resource was free
+        ledger_status, amount = "settled", 0.0
     elif status == "insufficient_balance":
         ledger_status, amount = "insufficient_balance", 0.0
     else:
@@ -136,9 +112,8 @@ def pay_for_resource(
         payment_session_id=session_id, payment_instrument_id=instrument_id,
         x402_network=network,
     )
-    return _envelope(invocation_id, wallet, q, status=ledger_status,
-                     detail=status, result=result, amount_usd=amount,
-                     payment_session_id=session_id)
+    return _envelope(invocation_id, wallet, q, status=ledger_status, detail=status,
+                     result=result, amount_usd=amount, payment_session_id=session_id)
 
 
 def _envelope(

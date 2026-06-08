@@ -1,13 +1,8 @@
-"""Per-user spend quotas + the x402 payment ledger.
+"""Per-user spend quotas and the x402 payment ledger.
 
-Two caps per user: `max_spend_per_query_usd` (one agent invocation) and
-`max_spend_per_day_usd` (rolling UTC day). Both nullable → unlimited.
-
-Daily spend is *computed* from the append-only `x402_payment_ledger` (SUM of
-settled amounts since UTC midnight), not tracked in a counter — no reset job,
-no races, and the ledger doubles as the audit trail. Per-query enforcement is
-belt-and-suspenders: we pre-check here AND set the PaymentSession maxSpendAmount
-so AWS rejects an over-cap payment in flight even if our estimate was low.
+Two caps per user (per-query, per-day); both nullable means unlimited. Daily
+spend is computed from the append-only ledger (sum of settled amounts since UTC
+midnight), so there is no reset job and the ledger doubles as the audit trail.
 """
 
 from __future__ import annotations
@@ -23,7 +18,7 @@ class QuotaError(Exception):
     """Raised when a payment would breach a per-query or per-day cap."""
 
     def __init__(self, scope: str, limit_usd: float, attempted_usd: float | None) -> None:
-        self.scope = scope  # 'per_query' | 'per_day'
+        self.scope = scope
         self.limit_usd = limit_usd
         self.attempted_usd = attempted_usd
         super().__init__(
@@ -40,9 +35,7 @@ def get_quotas(user_id: str, cfg: PaymentsConfig | None = None) -> dict[str, Any
     """Effective quotas for a user, falling back to config defaults when unset."""
     cfg = cfg or get_payments_config()
     with db() as conn:
-        row = conn.execute(
-            "SELECT * FROM user_payment_quotas WHERE user_id = ?", (user_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM user_payment_quotas WHERE user_id = ?", (user_id,)).fetchone()
     if row:
         return dict(row)
     return {
@@ -83,7 +76,6 @@ def set_quotas(
 
 
 def spent_today_usd(user_id: str) -> float:
-    """Sum of settled x402 spend since UTC midnight."""
     with db() as conn:
         row = conn.execute(
             """
@@ -97,7 +89,6 @@ def spent_today_usd(user_id: str) -> float:
 
 
 def spent_in_invocation_usd(invocation_id: str) -> float:
-    """Sum of settled spend already recorded for one agent invocation."""
     with db() as conn:
         row = conn.execute(
             """
@@ -131,15 +122,8 @@ def record_payment(
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                user_id,
-                invocation_id,
-                resource_url,
-                amount_usd,
-                status,
-                detail,
-                payment_session_id,
-                payment_instrument_id,
-                x402_network,
+                user_id, invocation_id, resource_url, amount_usd, status, detail,
+                payment_session_id, payment_instrument_id, x402_network,
             ),
         )
         conn.commit()

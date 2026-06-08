@@ -404,36 +404,30 @@ TABLES = {
         ("created_at",     "TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))"),
     ],
 
-    # ── AgentCore Payments (x402) — see docs/design-agentcore-payments.md ──
-    # One CDP Embedded Wallet (AgentCore payment instrument) per user. Lazily
-    # provisioned on first /wallet or /pay call; idempotent on user_id. The
-    # wallet is `pending_grant` until the user opens `redirect_url` (Coinbase
-    # WalletHub) once to grant the agent delegated-signing permission.
+    # AgentCore Payments (x402) — see docs/design-agentcore-payments.md.
+    # One CDP Embedded Wallet per user; `pending_grant` until the WalletHub grant.
     "user_wallets": [
         ("user_id",               "TEXT PRIMARY KEY REFERENCES users(id)"),
         ("payment_instrument_id", "TEXT NOT NULL"),
         ("wallet_address",        "TEXT"),
         ("linked_email",          "TEXT"),
-        ("wallet_network",        "TEXT NOT NULL DEFAULT 'ETHEREUM'"),   # CDP wallet family
-        ("redirect_url",          "TEXT"),                              # WalletHub grant link
-        ("status",                "TEXT NOT NULL DEFAULT 'pending_grant'"),  # pending_grant | active
+        ("wallet_network",        "TEXT NOT NULL DEFAULT 'ETHEREUM'"),
+        ("redirect_url",          "TEXT"),
+        ("status",                "TEXT NOT NULL DEFAULT 'pending_grant'"),
         ("created_at",            "TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))"),
         ("updated_at",            "TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))"),
     ],
 
-    # Per-user x402 spend caps. Both nullable = unlimited. `x402_network` is the
-    # chain the user transacts on (default base-sepolia testnet).
+    # Per-user x402 spend caps; NULL = unlimited.
     "user_payment_quotas": [
         ("user_id",                 "TEXT PRIMARY KEY REFERENCES users(id)"),
-        ("max_spend_per_query_usd", "REAL"),   # cap per agent invocation; NULL = unlimited
-        ("max_spend_per_day_usd",   "REAL"),   # rolling UTC-day cap; NULL = unlimited
+        ("max_spend_per_query_usd", "REAL"),
+        ("max_spend_per_day_usd",   "REAL"),
         ("x402_network",            "TEXT NOT NULL DEFAULT 'base-sepolia'"),
         ("updated_at",              "TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))"),
     ],
 
-    # Append-only x402 payment ledger — source of truth for daily-spend
-    # computation (SUM over created_at >= UTC midnight) and audit. One row per
-    # attempted payment; `status` distinguishes settled vs blocked vs failed.
+    # Append-only payment ledger; source of truth for daily-spend SUM and audit.
     "x402_payment_ledger": [
         ("id",                    "INTEGER PRIMARY KEY AUTOINCREMENT"),
         ("user_id",               "TEXT NOT NULL REFERENCES users(id)"),
