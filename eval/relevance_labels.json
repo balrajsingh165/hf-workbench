@@ -1,0 +1,67 @@
+{
+  "_meta": {
+    "purpose": "Hand-labeled ground truth for find_markets eval. Each label is true=market is in the same domain as the query, false=different subject. Borderline calls err strict (different question == irrelevant) since prediction-market matches are meant to be directly tradeable.",
+    "labeller": "claude (subjective review, 2026-04-26)"
+  },
+  "thesis_001": {
+    "polymarket:0xfdc73f10edf0266756686f35b5712cffa828b0940fc015e0426c76c934c2105d": {"relevant": false, "note": "US recession — different question from rate path / inflation persistence"},
+    "polymarket:0xa1b91b95e0941fafb86b8e55f5f8051bf5620f5b03d8547dfb1cf81e10abf077": {"relevant": false, "note": "Powell removal — leadership ≠ inflation thesis"},
+    "polymarket:0x5e082f0b57f47a29044aa35b4c5658393122e659d5feae521c06b57cdd7f905c": {"relevant": true,  "note": "Direct cut-count market"},
+    "polymarket:0x22ed0a1f029b7ca62fee0d6b759b502d20967348b627984478679d4ee7f0f1e3": {"relevant": true,  "note": "Pause-cut-cut Mar-Apr-Jun — almost exact thesis"},
+    "polymarket:0x626d0441b078eefbe2c49047960e7a3b6b4512c235507a2528ccc0f95f2474a6": {"relevant": true,  "note": "Near-term April cut probability"},
+    "polymarket:0xd4d00e5bf8b960cc37c74c1ec19e41e00b0706add203ddcfbb65ad006c5c223a": {"relevant": true,  "note": "April rate path — direct"},
+    "polymarket:0x36e8ca24d2a13435f519f15580d42b45cdbe3bc425fb39a7c2733260357af0fa": {"relevant": true,  "note": "Hold-rates April — direct test of thesis"},
+    "polymarket:0xd4e77ba6f29fc093509d24f508631abd445ecf506bbdc9c4c80e60256a318527": {"relevant": true,  "note": "No cuts 2026 — extreme form of thesis"},
+    "polymarket:0xb5c0abeecb5502e6e8d83155c27819174d8317af3c425c3afc5a8c45257a3793": {"relevant": true,  "note": "July rate path"},
+    "polymarket:0x4e4a7df876b0c04f0b8b29b9073eddfbaf5c787192da825ae7ca1031bc8cfd15": {"relevant": true,  "note": "June 50bp cut — direct invalidation marker"}
+  },
+  "thesis_002": {
+    "polymarket:0x857398c4502bc725fef7efb3cd503a30d3e18e486ab8173fdf505a76cf83b168": {"relevant": false, "note": "AI bubble — different subject (valuation, not industrial automation buildout)"},
+    "polymarket:0x54b36f27449bac18ab792efb1fce8e923d6dc190a311cb28aef0926583ae5760": {"relevant": false, "note": "NVIDIA market cap — about NVDA, not Rockwell/Emerson/Fanuc"},
+    "polymarket:0x2f4804bf7b7cc0005e89b12a1326b721c334a5ceb0b8b8d5628fd52d401295c3": {"relevant": false, "note": "NVIDIA market cap rank — same — irrelevant to industrial automation thesis"},
+    "polymarket:0xcaa5988656f92123f26fb2ed7a55d59f8991e5e27a80263f9d15aeedad851156": {"relevant": false, "note": "NVIDIA market cap rank — same"}
+  },
+  "thesis_003": {
+    "polymarket:0x8fe8b0f19001c5d61f186edc1991347a60eda9c5bc096f5f144c13d6cd72de78": {"relevant": true, "note": "WTI strike — energy crunch domain"},
+    "polymarket:0x7eceae72d7d7b3e175fa872c728526e6fec4714288a4bda91fe818e298e69a6f": {"relevant": true, "note": "WTI strike — same"},
+    "polymarket:0x0fa5d80f8f8fec384b629d60a47c8c669ff7e6ea469edb9f91ccfd030b7f56d7": {"relevant": true, "note": "WTI strike"},
+    "polymarket:0x5f879a52e5349db7f66d386ca75f1a9bb608fdd6a738a1582681613730b23281": {"relevant": true, "note": "Crude June strike"},
+    "polymarket:0x67a8543bf23f52dfe5c908f512ea04e749c9044a6ff1a9fcf32a60b936b79472": {"relevant": true, "note": "WTI LOW $70 — invalidation case, same domain"},
+    "polymarket:0x39104f7f48f4f379de4162f0cf64c24bf1ccb1f786fd7fafb3fbfb879fffedcc": {"relevant": true, "note": "WTI strike"},
+    "polymarket:0x2226a3e40300238a813bddccb7cadef078ffce4c83e237d85a135e685f0b81b5": {"relevant": true, "note": "WTI strike"}
+  },
+  "news_001": {
+    "polymarket:0x1d2787cb8aed975d092b2799ed6f4083e9445f7420cdc09e9d47e7d54356c6cd": {"relevant": true, "note": "Iran ceasefire — literal headline match"},
+    "polymarket:0x65414628f108533d689721c6b2576dd83da43644bcfd62506444f1591ef32c31": {"relevant": true, "note": "WTI $100 — energy theme from article"},
+    "polymarket:0xfa59099fbda1e0f0058ed3cbd57e939fe90ab6d9b57d53bd488bcadf75c191d4": {"relevant": true, "note": "Iran military ops — directly tied to ceasefire"},
+    "polymarket:0x8fe8b0f19001c5d61f186edc1991347a60eda9c5bc096f5f144c13d6cd72de78": {"relevant": true, "note": "WTI $200 — energy/Iran"},
+    "polymarket:0x0e4a0c937b8934c2475613b6322b3f8edc8dedc24762e01e42b0e6f87424a089": {"relevant": true, "note": "Iran peace deal — same theme"},
+    "polymarket:0x39104f7f48f4f379de4162f0cf64c24bf1ccb1f786fd7fafb3fbfb879fffedcc": {"relevant": true, "note": "WTI $150 — energy/Iran"}
+  },
+  "news_002": {
+    "polymarket:0xd4d00e5bf8b960cc37c74c1ec19e41e00b0706add203ddcfbb65ad006c5c223a": {"relevant": true, "note": "Fed April rate path — directly matches headline"},
+    "polymarket:0xd4e77ba6f29fc093509d24f508631abd445ecf506bbdc9c4c80e60256a318527": {"relevant": true, "note": "No cuts 2026 — exact thesis of news"},
+    "polymarket:0xb5c0abeecb5502e6e8d83155c27819174d8317af3c425c3afc5a8c45257a3793": {"relevant": true, "note": "Fed July hike — rate path"},
+    "polymarket:0x3d20f26deb9b9cc7e24e5e06c10234a722d93bac095ce1105c59b44b503078d7": {"relevant": true, "note": "Fed funds upper bound year-end — direct"},
+    "polymarket:0xb01e70a56199a6d5467f47a2b94e75e7c7218c128c8d0b8beb6dafed2f0d15c2": {"relevant": true, "note": "Fed June hike — rate path"}
+  },
+  "news_003": {
+    "polymarket:0xaaacff0f7424b38e61ee5c5b2ea9d7335d0553eca2afb874267cd94c54a11925": {"relevant": false, "note": "Trump China visit — diplomatic, not tariff policy hearing"}
+  },
+  "news_004": {
+    "polymarket:0x857398c4502bc725fef7efb3cd503a30d3e18e486ab8173fdf505a76cf83b168": {"relevant": false, "note": "AI bubble — VIX crash article is about volatility, not AI valuation"},
+    "polymarket:0xfdc73f10edf0266756686f35b5712cffa828b0940fc015e0426c76c934c2105d": {"relevant": true,  "note": "US recession — macro tail risk to the bullish forward-return thesis"}
+  },
+  "news_005": {
+    "polymarket:0x857398c4502bc725fef7efb3cd503a30d3e18e486ab8173fdf505a76cf83b168": {"relevant": false, "note": "AI bubble — ServiceNow earnings article is bullish on AI demand, bubble burst is contrary domain"}
+  },
+  "news_006": {
+    "polymarket:0x54b36f27449bac18ab792efb1fce8e923d6dc190a311cb28aef0926583ae5760": {"relevant": true,  "note": "NVIDIA market cap #1 — direct NVDA market"},
+    "polymarket:0x2f4804bf7b7cc0005e89b12a1326b721c334a5ceb0b8b8d5628fd52d401295c3": {"relevant": true,  "note": "NVIDIA market cap #2 — direct NVDA market"},
+    "polymarket:0xcaa5988656f92123f26fb2ed7a55d59f8991e5e27a80263f9d15aeedad851156": {"relevant": true,  "note": "NVIDIA market cap #3 — direct NVDA market"},
+    "polymarket:0x93a144757495d68c867022424152e77ed5ff20a473cb05e16960de2b88300bd8": {"relevant": false, "note": "DeepSeek best model — about AI model winners, not NVDA chips"},
+    "polymarket:0xf105ea1a83605540617366526881a245bd0fb586e0cfe15c1582d0d3ee579558": {"relevant": false, "note": "OpenAI best model — same as DeepSeek"},
+    "polymarket:0xd0c6d2c194bdf7d9773c952da1d26203fceaebe0320396dbc55ad4af911ea474": {"relevant": false, "note": "Amazon market cap — different stock"},
+    "polymarket:0x857398c4502bc725fef7efb3cd503a30d3e18e486ab8173fdf505a76cf83b168": {"relevant": false, "note": "AI bubble — broad thematic overlap, not subject of news"}
+  }
+}

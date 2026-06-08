@@ -1,0 +1,2 @@
+"""AI SDK compatibility router."""
+

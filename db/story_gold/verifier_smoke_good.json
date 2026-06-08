@@ -1,0 +1,44 @@
+{
+  "members": [
+    {
+      "news_id": "news_gold_001",
+      "body": "Acme said quarterly revenue rose 18% as chip orders accelerated. CEO Dana Lee said \"AI server demand strengthened through April.\""
+    }
+  ],
+  "payload": {
+    "headline": "Acme chip orders accelerate on AI server demand.",
+    "thesis_line": "AI server demand supports semiconductor suppliers over the next several weeks.",
+    "what_changed": "Acme reported faster revenue growth and stronger AI server orders.",
+    "overview": [
+      {
+        "text": "Acme reported an 18% quarterly revenue increase tied to chip orders.",
+        "source_doc_ids": ["news_gold_001"],
+        "confidence": "high"
+      }
+    ],
+    "claims": [
+      {
+        "text": "Chip orders accelerated during the quarter.",
+        "claim_type": "demand_update",
+        "source_doc_ids": ["news_gold_001"],
+        "stance": "reported_as_fact"
+      }
+    ],
+    "quotes": [
+      {
+        "text": "AI server demand strengthened through April.",
+        "speaker": "Dana Lee",
+        "speaker_title": "CEO",
+        "source_doc_ids": ["news_gold_001"]
+      }
+    ],
+    "market_relevance": {
+      "tickers": ["ACME"],
+      "sectors": ["technology.semiconductor"],
+      "regions": ["north_america"],
+      "direction": "bullish",
+      "horizon": "weeks"
+    }
+  },
+  "expect_verifier_ok": true
+}

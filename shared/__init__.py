@@ -1,0 +1,43 @@
+"""Shared helpers for agent-journal tooling."""
+
+from .gemini import (
+    DEFAULT_EMBEDDING_DIM,
+    DEFAULT_GEMINI_MODEL,
+    GEMINI_3_1_PRO_PREVIEW,
+    GEMINI_3_1_PRO_PREVIEW_CUSTOMTOOLS,
+    GEMINI_3_FLASH_PREVIEW,
+    GEMINI_EMBEDDING_2_PREVIEW,
+    GEMINI_MODELS,
+    EmbeddingResult,
+    GeminiBatchResult,
+    GeminiRateLimiter,
+    GeminiRequest,
+    GeminiResult,
+    batch_embed_contents,
+    batch_generate_texts,
+    embed_content,
+    generate_text,
+    generate_text_with_retry,
+    get_gemini_client,
+)
+
+__all__ = [
+    "DEFAULT_EMBEDDING_DIM",
+    "DEFAULT_GEMINI_MODEL",
+    "GEMINI_3_1_PRO_PREVIEW",
+    "GEMINI_3_1_PRO_PREVIEW_CUSTOMTOOLS",
+    "GEMINI_3_FLASH_PREVIEW",
+    "GEMINI_EMBEDDING_2_PREVIEW",
+    "GEMINI_MODELS",
+    "EmbeddingResult",
+    "GeminiBatchResult",
+    "GeminiRateLimiter",
+    "GeminiRequest",
+    "GeminiResult",
+    "batch_embed_contents",
+    "batch_generate_texts",
+    "embed_content",
+    "generate_text",
+    "generate_text_with_retry",
+    "get_gemini_client",
+]

@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""Agent Journal unified CLI.
+
+Usage:
+    aj search "steering alpha" --recent 3
+    aj search "paper" --agent factory --context 2
+    aj read <session-short-id>                    # full transcript
+    aj read <session-short-id> --tail 30          # last 30 messages
+    aj read <session-short-id> --role assistant    # filter by role
+    aj read <session-short-id> --grep "alignment"  # filter messages
+    aj ask "what experiment setups did we use?"
+    aj ask "common training failures" --raw --agent factory
+    aj topics --recent 5
+    aj digest --recent 2
+    aj digest --agent codex --recent 1
+    aj resume --project proj-1-onboarding
+    aj resume --overnight
+    aj sessions
+    aj sessions --agent codex
+"""
+
+import subprocess
+import sys
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0
+
+    cmd = sys.argv[1]
+    rest = sys.argv[2:]
+
+    if cmd == "search":
+        if rest and not rest[0].startswith("-"):
+            rest = ["--text", rest[0]] + rest[1:]
+        return subprocess.call([sys.executable, str(SCRIPT_DIR / "search.py")] + rest)
+
+    elif cmd == "read":
+        sys.path.insert(0, str(SCRIPT_DIR.parent))
+        sys.path.insert(0, str(SCRIPT_DIR))
+        from lib.session_io import (
+            agent_tag, extract_conversation_text, load_session_content,
+            resolve_session_by_prefix,
+        )
+        import argparse as _ap
+
+        p = _ap.ArgumentParser(description="Read a session transcript by short ID")
+        p.add_argument("session_id", help="Session short ID (8-char prefix or full UUID)")
+        p.add_argument("--tail", type=int, help="Show last N messages only")
+        p.add_argument("--role", choices=["user", "assistant"], help="Filter to one role")
+        p.add_argument("--grep", help="Filter messages containing keyword (case-insensitive)")
+        p.add_argument("--format", choices=["text", "json"], default="text")
+        args = p.parse_args(rest)
+
+        session = resolve_session_by_prefix(args.session_id)
+        if not session:
+            print(f"No session found matching prefix: {args.session_id}")
+            return 1
+
+        content = load_session_content(
+            project=session.project,
+            session_id=session.session_id,
+            agent_type=session.agent_type,
+            file_path=session.file_path,
+        )
+
+        # Build chronological message list
+        events = []
+        for msg in content.user_messages:
+            events.append((msg["timestamp"], "USER", msg["text"]))
+        for msg in content.assistant_messages:
+            events.append((msg["timestamp"], "ASSISTANT", msg["text"]))
+        events.sort(key=lambda e: e[0])
+
+        # Apply filters
+        if args.role:
+            target = args.role.upper()
+            events = [e for e in events if e[1] == target]
+        if args.grep:
+            kw = args.grep.lower()
+            events = [e for e in events if kw in e[2].lower()]
+        if args.tail:
+            events = events[-args.tail:]
+
+        # Print header
+        tag = agent_tag(session.agent_type)
+        print(f"[{tag}] {session.session_id[:8]} ({session.agent_type})")
+        print(f"  Started: {session.started_at or '?'}")
+        print(f"  Updated: {session.updated_at or '?'}")
+        print(f"  Records: {session.record_count}")
+        print(f"  Messages: {len(content.user_messages)} user, {len(content.assistant_messages)} assistant")
+        print(f"  Title: {session.title[:80]}")
+        print(f"  File: {session.file_path}")
+        print()
+
+        if args.format == "json":
+            import json as _json
+            print(_json.dumps([
+                {"timestamp": ts, "role": role, "text": text}
+                for ts, role, text in events
+            ], indent=2, ensure_ascii=False))
+        else:
+            for ts, role, text in events:
+                text_trunc = text[:3000] if len(text) > 3000 else text
+                print(f"[{ts[:19]}] {role}: {text_trunc}\n")
+
+        return 0
+
+    elif cmd == "topics":
+        return subprocess.call([sys.executable, str(SCRIPT_DIR / "search.py"), "--topics"] + rest)
+
+    elif cmd == "ask":
+        if rest and not rest[0].startswith("-"):
+            rest = ["--query", rest[0]] + rest[1:]
+        return subprocess.call([sys.executable, str(SCRIPT_DIR / "ask.py")] + rest)
+
+    elif cmd == "digest":
+        return subprocess.call([sys.executable, str(SCRIPT_DIR / "digest.py")] + rest)
+
+    elif cmd == "resume":
+        return subprocess.call([sys.executable, str(SCRIPT_DIR / "resume.py")] + rest)
+
+    elif cmd == "sessions":
+        sys.path.insert(0, str(SCRIPT_DIR.parent))
+        sys.path.insert(0, str(SCRIPT_DIR))
+        from lib.session_io import list_sessions, list_all_sessions, agent_tag
+        import argparse
+        p = argparse.ArgumentParser()
+        p.add_argument("--agent", choices=["claude", "codex", "factory"])
+        p.add_argument("--project", default="-home-appuser-hf-workbench")
+        p.add_argument("--limit", type=int, default=10)
+        args = p.parse_args(rest)
+
+        if args.agent:
+            sessions = list_sessions(args.project, agent_type=args.agent, limit=args.limit)
+        else:
+            sessions = list_all_sessions(limit_per_type=args.limit)[:args.limit]
+
+        for s in sessions:
+            tag = agent_tag(s.agent_type)
+            sid = s.session_id[:8]
+            ts = s.started_at[:16] if s.started_at else "?"
+            print(f"[{tag}] {sid} {ts} {s.title[:70]}")
+        return 0
+
+    else:
+        print(f"Unknown command: {cmd}\nCommands: search, read, ask, topics, digest, resume, sessions")
+        return 1
+
+if __name__ == "__main__":
+    raise SystemExit(main())
