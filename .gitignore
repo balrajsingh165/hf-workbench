@@ -13,7 +13,6 @@ __pycache__/
 
 db/*.db-shm
 db/*.db-wal
-db/hf.db
 db/pm_cache.json
 db/*.sqlite
 db/story_review_packet.csv
