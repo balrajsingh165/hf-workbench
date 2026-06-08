@@ -403,6 +403,50 @@ TABLES = {
         ("model_id",       "TEXT NOT NULL"),
         ("created_at",     "TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))"),
     ],
+
+    # ── AgentCore Payments (x402) — see docs/design-agentcore-payments.md ──
+    # One CDP Embedded Wallet (AgentCore payment instrument) per user. Lazily
+    # provisioned on first /wallet or /pay call; idempotent on user_id. The
+    # wallet is `pending_grant` until the user opens `redirect_url` (Coinbase
+    # WalletHub) once to grant the agent delegated-signing permission.
+    "user_wallets": [
+        ("user_id",               "TEXT PRIMARY KEY REFERENCES users(id)"),
+        ("payment_instrument_id", "TEXT NOT NULL"),
+        ("wallet_address",        "TEXT"),
+        ("linked_email",          "TEXT"),
+        ("wallet_network",        "TEXT NOT NULL DEFAULT 'ETHEREUM'"),   # CDP wallet family
+        ("redirect_url",          "TEXT"),                              # WalletHub grant link
+        ("status",                "TEXT NOT NULL DEFAULT 'pending_grant'"),  # pending_grant | active
+        ("created_at",            "TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))"),
+        ("updated_at",            "TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))"),
+    ],
+
+    # Per-user x402 spend caps. Both nullable = unlimited. `x402_network` is the
+    # chain the user transacts on (default base-sepolia testnet).
+    "user_payment_quotas": [
+        ("user_id",                 "TEXT PRIMARY KEY REFERENCES users(id)"),
+        ("max_spend_per_query_usd", "REAL"),   # cap per agent invocation; NULL = unlimited
+        ("max_spend_per_day_usd",   "REAL"),   # rolling UTC-day cap; NULL = unlimited
+        ("x402_network",            "TEXT NOT NULL DEFAULT 'base-sepolia'"),
+        ("updated_at",              "TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))"),
+    ],
+
+    # Append-only x402 payment ledger — source of truth for daily-spend
+    # computation (SUM over created_at >= UTC midnight) and audit. One row per
+    # attempted payment; `status` distinguishes settled vs blocked vs failed.
+    "x402_payment_ledger": [
+        ("id",                    "INTEGER PRIMARY KEY AUTOINCREMENT"),
+        ("user_id",               "TEXT NOT NULL REFERENCES users(id)"),
+        ("invocation_id",         "TEXT NOT NULL"),               # groups payments within one agent turn
+        ("resource_url",          "TEXT NOT NULL"),
+        ("amount_usd",            "REAL NOT NULL DEFAULT 0"),
+        ("status",                "TEXT NOT NULL"),               # settled | blocked_quota | failed | insufficient_balance
+        ("detail",                "TEXT"),
+        ("payment_session_id",    "TEXT"),
+        ("payment_instrument_id", "TEXT"),
+        ("x402_network",          "TEXT"),
+        ("created_at",            "TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))"),
+    ],
 }
 
 INDEXES = (
@@ -484,6 +528,10 @@ INDEXES = (
     "ON code_interpreter_runs (request_id)",
     "CREATE INDEX IF NOT EXISTS idx_ci_runs_outcome_time "
     "ON code_interpreter_runs (outcome, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_x402_ledger_user_time "
+    "ON x402_payment_ledger (user_id, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_x402_ledger_invocation "
+    "ON x402_payment_ledger (invocation_id)",
 )
 
 def init_db(db_path=DB_PATH, tables: Iterable[str] | None = None):

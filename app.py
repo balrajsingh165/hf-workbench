@@ -58,6 +58,7 @@ from src.agent.observability import (
 )
 from src.interfaces.ai_sdk_compat.api import router as ai_sdk_router
 from src.interfaces.chat.api import router as chat_router
+from src.interfaces.payments.api import router as payments_router
 from src.interfaces.prices.api import router as prices_router
 from src.i18n import (
     localized_markdown_path,
@@ -88,6 +89,7 @@ app.add_middleware(
 app.include_router(ai_sdk_router)
 app.include_router(chat_router)
 app.include_router(prices_router)
+app.include_router(payments_router)
 
 from src.api.metrics_router import router as metrics_router
 
