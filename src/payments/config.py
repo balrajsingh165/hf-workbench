@@ -9,6 +9,13 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load repo-root .env on import so standalone entry points (scripts, agents)
+# resolve AWS_PROFILE etc. without relying on app.py. Mirrors src/agent/config.py.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 _DEFAULT_MANAGER_ARN = (
     "arn:aws:bedrock-agentcore:us-west-2:441070252417:"
