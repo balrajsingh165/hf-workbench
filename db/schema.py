@@ -423,7 +423,7 @@ TABLES = {
         ("user_id",                 "TEXT PRIMARY KEY REFERENCES users(id)"),
         ("max_spend_per_query_usd", "REAL"),
         ("max_spend_per_day_usd",   "REAL"),
-        ("x402_network",            "TEXT NOT NULL DEFAULT 'base-sepolia'"),
+        ("x402_network",            "TEXT NOT NULL DEFAULT 'base'"),
         ("updated_at",              "TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))"),
     ],
 

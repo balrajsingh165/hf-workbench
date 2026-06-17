@@ -74,7 +74,7 @@ def get_payments_config() -> PaymentsConfig:
             "AGENTPAY_PROCESS_PAYMENT_ROLE_ARN", _DEFAULT_PROCESS_PAYMENT_ROLE
         ).strip(),
         wallet_network=os.environ.get("AGENTPAY_WALLET_NETWORK", "ETHEREUM").strip(),
-        default_x402_network=os.environ.get("AGENTPAY_X402_NETWORK", "base-sepolia").strip(),
+        default_x402_network=os.environ.get("AGENTPAY_X402_NETWORK", "base").strip(),
         linked_email_domain=os.environ.get("AGENTPAY_LINKED_EMAIL_DOMAIN", "hf-users.heurist.xyz").strip(),
         session_expiry_minutes=int(os.environ.get("AGENTPAY_SESSION_EXPIRY_MINUTES", "60")),
         unlimited_session_cap_usd=float(os.environ.get("AGENTPAY_UNLIMITED_SESSION_CAP_USD", "10000.0")),
