@@ -47,6 +47,12 @@ def ensure_user(user_id: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--user", default=TEST_USER)
+    parser.add_argument(
+        "--email",
+        default=None,
+        help="Linked email for the wallet (use a real inbox you control so the "
+        "WalletHub grant can be completed; synthesized if omitted)",
+    )
     parser.add_argument("--resource", default=DEFAULT_RESOURCE)
     parser.add_argument("--method", default="POST")
     parser.add_argument("--per-query", type=float, default=0.50)
@@ -62,13 +68,19 @@ def main() -> int:
     ensure_user(args.user)
 
     print("\n[1/4] Provisioning wallet ...")
-    wallet = wallets.get_or_provision(args.user)
+    wallet = wallets.get_or_provision(args.user, email=args.email)
     print(json.dumps(wallet, indent=2, default=str))
     if wallet.get("status") != "active":
+        net = cfg.default_x402_network
+        fund_hint = (
+            "testnet USDC: https://faucet.circle.com/"
+            if "sepolia" in net
+            else f"real USDC on {net}"
+        )
         print(
             "\n⚠️  Wallet needs the delegated-signing grant + funding before payments work:\n"
-            f"    1. Open: {wallet.get('redirect_url')}\n"
-            f"    2. Fund {wallet.get('wallet_address')} with Base Sepolia USDC: https://faucet.circle.com/\n"
+            f"    1. Open: {wallet.get('redirect_url')}  (sign in with the linked email to grant)\n"
+            f"    2. Fund {wallet.get('wallet_address')} with {fund_hint}\n"
             "    Then re-run this script."
         )
 
@@ -81,7 +93,7 @@ def main() -> int:
     print(json.dumps(q, indent=2, default=str))
 
     print(f"\n[3/4] Paying for resource: {args.resource}")
-    result = pay_for_resource(args.user, args.resource, method=args.method, body={})
+    result = pay_for_resource(args.user, args.resource, method=args.method, body={}, email=args.email)
     print(json.dumps(result, indent=2, default=str))
 
     print("\n[4/4] Spending after payment:")
